@@ -12,8 +12,10 @@ const ETSY_TOKEN_URL = "https://api.etsy.com/v3/public/oauth/token";
 const ETSY_API_BASE = "https://api.etsy.com/v3/application";
 const SHIPPO_API_BASE = "https://api.goshippo.com";
 const OAUTH_COOKIE_NAME = "etsy_oauth";
+const AUTH_COOKIE_NAME = "dashboard_auth";
 const listingImageCache = new Map();
 const shippoTrackingCache = new Map();
+const DASHBOARD_PASSWORD = process.env.DASHBOARD_PASSWORD || "3739";
 const REQUIRED_CONFIG_FIELDS = [
   "etsy_api_key",
   "etsy_api_secret",
@@ -23,7 +25,6 @@ const REQUIRED_CONFIG_FIELDS = [
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
 
 // ================= CONFIG =================
 function loadConfig() {
@@ -223,11 +224,122 @@ function parseCookies(req) {
   return Object.fromEntries(
     header.split(";").map((cookie) => {
       const index = cookie.indexOf("=");
+      if (index === -1) return [decodeURIComponent(cookie.trim()), ""];
       const key = decodeURIComponent(cookie.slice(0, index).trim());
       const value = decodeURIComponent(cookie.slice(index + 1).trim());
       return [key, value];
     })
   );
+}
+
+function authCookieValue() {
+  return crypto
+    .createHmac("sha256", DASHBOARD_PASSWORD)
+    .update("custom-3d-dashboard")
+    .digest("hex");
+}
+
+function isAuthenticated(req) {
+  return parseCookies(req)[AUTH_COOKIE_NAME] === authCookieValue();
+}
+
+function setAuthCookie(res) {
+  const secure = process.env.NODE_ENV === "production";
+  const parts = [
+    `${AUTH_COOKIE_NAME}=${authCookieValue()}`,
+    "HttpOnly",
+    "SameSite=Lax",
+    "Path=/",
+    "Max-Age=2592000"
+  ];
+
+  if (secure) parts.push("Secure");
+  res.setHeader("Set-Cookie", parts.join("; "));
+}
+
+function clearAuthCookie(res) {
+  res.setHeader(
+    "Set-Cookie",
+    `${AUTH_COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`
+  );
+}
+
+function loginPage(errorMessage = "") {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <title>Custom 3D Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      display: grid;
+      place-items: center;
+      background: #101318;
+      color: #f3f5f7;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    form {
+      width: min(360px, calc(100vw - 32px));
+      display: grid;
+      gap: 14px;
+      padding: 22px;
+      border: 1px solid rgba(190, 199, 210, 0.16);
+      border-radius: 8px;
+      background: #171b22;
+    }
+    h1 { margin: 0 0 4px; font-size: 1.6rem; }
+    label { display: grid; gap: 8px; color: #9aa4b2; font-size: 0.9rem; }
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid rgba(190, 199, 210, 0.2);
+      border-radius: 6px;
+      background: #101318;
+      color: #f3f5f7;
+      font: inherit;
+    }
+    button {
+      border: 0;
+      border-radius: 6px;
+      padding: 12px;
+      background: #37c6ab;
+      color: #06130f;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .error { min-height: 1.2em; margin: 0; color: #ff6b6b; }
+  </style>
+</head>
+<body>
+  <form method="post" action="/login">
+    <h1>Custom 3D</h1>
+    <label>
+      Password
+      <input name="password" type="password" inputmode="numeric" autocomplete="current-password" autofocus>
+    </label>
+    <button type="submit">Open dashboard</button>
+    <p class="error">${errorMessage}</p>
+  </form>
+</body>
+</html>`;
+}
+
+function requireDashboardAuth(req, res, next) {
+  if (isAuthenticated(req)) {
+    next();
+    return;
+  }
+
+  if (req.path === "/orders" || req.path === "/health") {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  res.redirect("/login");
 }
 
 function setOAuthCookie(res, state, codeVerifier) {
@@ -262,6 +374,42 @@ function getOAuthCookie(req) {
     return null;
   }
 }
+
+// ================= DASHBOARD AUTH =================
+app.get("/login", (req, res) => {
+  if (isAuthenticated(req)) {
+    res.redirect("/");
+    return;
+  }
+
+  res.send(loginPage());
+});
+
+app.post("/login", express.urlencoded({ extended: false }), (req, res) => {
+  if (String(req.body?.password || "") === DASHBOARD_PASSWORD) {
+    setAuthCookie(res);
+    res.redirect("/");
+    return;
+  }
+
+  res.status(401).send(loginPage("Incorrect password."));
+});
+
+app.get("/logout", (req, res) => {
+  clearAuthCookie(res);
+  res.redirect("/login");
+});
+
+app.get("/", requireDashboardAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+app.use(
+  requireDashboardAuth,
+  express.static(path.join(__dirname, "public"), {
+    index: false
+  })
+);
 
 // ================= OAUTH START =================
 app.get("/oauth", (req, res) => {
