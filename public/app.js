@@ -186,7 +186,8 @@ function buildCard(order) {
     : null;
   const primaryDateLabel = order.status === "DELIVERED" ? "Ship by" : "Ship by";
   const primaryDateValue = formatDate(order.shipBy);
-  const etsyUrl = order.etsyUrl || `https://www.etsy.com/your/shops/me/orders/${encodeURIComponent(order.receiptId || order.id || "")}`;
+  const etsyUrl = order.etsyUrl ||
+    `https://www.etsy.com/your/orders/sold?ref=seller-platform-mcnav&order_id=${encodeURIComponent(order.receiptId || order.id || "")}`;
 
   return `
     <article class="order-card" role="link" tabindex="0" onclick="openOrder('${escapeHtml(etsyUrl)}')" onkeydown="handleOrderKey(event, '${escapeHtml(etsyUrl)}')">
@@ -312,6 +313,10 @@ setInterval(() => {
 
 function refresh() {
   load();
+}
+
+function reconnectEtsy() {
+  window.location.href = "/oauth";
 }
 
 function setFilter(filter) {
