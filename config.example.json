@@ -1,0 +1,9 @@
+{
+  "etsy_api_key": "your_etsy_keystring",
+  "etsy_api_secret": "your_etsy_shared_secret",
+  "etsy_redirect_uri": "http://localhost:3000/oauth/callback",
+  "shop_id": "your_etsy_shop_id",
+  "shippo_api_key": "your_shippo_api_key",
+  "etsy_access_token": "",
+  "etsy_refresh_token": ""
+}

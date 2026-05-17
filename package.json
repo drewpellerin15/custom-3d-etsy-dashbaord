@@ -1,0 +1,16 @@
+{
+  "name": "etsy-dashboard",
+  "version": "1.0.0",
+  "description": "Etsy order + Shippo tracking dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "crypto": "^1.0.1",
+    "express": "^4.22.1",
+    "node-fetch": "^2.7.0"
+  }
+}
