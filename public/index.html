@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Etsy Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app-shell">
+  <header class="topbar">
+    <div class="topbar-title">
+      <h1>Custom 3D</h1>
+    </div>
+
+    <div class="topbar-actions">
+      <div id="summary" class="summary-grid"></div>
+      <div class="action-row">
+        <button class="primary" onclick="refresh()">Refresh</button>
+        <div class="meta">
+          <span id="current-time">--</span>
+          <span id="last-updated">Loading</span>
+          <span id="order-count">Orders</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+    <div class="orders-section">
+      <div class="orders-header">
+        <div>
+          <h2>Recent orders</h2>
+        </div>
+        <div class="filter-tabs" role="tablist" aria-label="Order filter">
+          <button class="filter-tab active" data-filter="ALL" onclick="setFilter('ALL')">All</button>
+          <button class="filter-tab" data-filter="OPEN" onclick="setFilter('OPEN')">Open</button>
+          <button class="filter-tab" data-filter="SHIPPED" onclick="setFilter('SHIPPED')">Shipped</button>
+        </div>
+      </div>
+
+      <div id="grid" class="order-grid"></div>
+      <div id="empty" class="empty-state">No orders available. Try refreshing or connecting to Etsy.</div>
+
+      <div class="pagination-bar">
+        <button class="secondary" onclick="prevPage()" id="prevBtn">Previous</button>
+        <span id="pageIndicator">Page 1</span>
+        <button class="secondary" onclick="nextPage()" id="nextBtn">Next</button>
+      </div>
+    </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

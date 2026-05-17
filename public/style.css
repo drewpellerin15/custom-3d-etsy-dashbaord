@@ -1,0 +1,466 @@
+:root {
+  color-scheme: dark;
+  --bg: #101318;
+  --panel: #171b22;
+  --panel-strong: #1f252e;
+  --text: #f3f5f7;
+  --muted: #9aa4b2;
+  --border: rgba(190, 199, 210, 0.16);
+  --accent: #37c6ab;
+  --accent-strong: #9ee7d9;
+  --late: #ff6b6b;
+  --soon: #f3b34c;
+  --ok: #55d685;
+  --shipped: #70a7ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.app-shell {
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px;
+}
+
+.topbar {
+  min-height: 104px;
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--accent-strong);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--muted);
+  max-width: 560px;
+  line-height: 1.35;
+}
+
+.topbar-actions {
+  min-width: 690px;
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 12px;
+  align-items: center;
+  justify-content: end;
+}
+
+.action-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.meta {
+  display: grid;
+  gap: 3px;
+  min-width: 126px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.2;
+  text-align: right;
+}
+
+#current-time {
+  color: var(--text);
+  font-weight: 800;
+}
+
+button {
+  border: 0;
+  border-radius: 6px;
+  padding: 9px 13px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+
+button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.primary {
+  background: var(--accent);
+  color: #06130f;
+}
+
+.primary:hover {
+  background: var(--accent-strong);
+}
+
+.secondary,
+.filter-tab {
+  border: 1px solid var(--border);
+  background: #202631;
+  color: var(--text);
+}
+
+.secondary:hover,
+.filter-tab:hover {
+  border-color: rgba(158, 231, 217, 0.5);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(86px, 1fr));
+  gap: 8px;
+}
+
+.summary-card {
+  min-width: 86px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-strong);
+}
+
+.summary-label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1;
+  margin-bottom: 7px;
+}
+
+.summary-card strong {
+  display: block;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.orders-section {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #13171d;
+}
+
+.orders-header {
+  min-height: 40px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.orders-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: 0;
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.filter-tab {
+  min-width: 76px;
+  padding: 8px 10px;
+}
+
+.filter-tab.active {
+  background: rgba(55, 198, 171, 0.16);
+  border-color: rgba(55, 198, 171, 0.6);
+  color: var(--accent-strong);
+}
+
+.order-grid {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.order-card {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 38% minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid rgba(190, 199, 210, 0.14);
+  border-radius: 8px;
+  background: var(--panel);
+  cursor: pointer;
+}
+
+.order-card:hover {
+  border-color: rgba(55, 198, 171, 0.5);
+}
+
+.order-image {
+  position: relative;
+  min-height: 0;
+  background: #0b0f14;
+}
+
+.order-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  color: transparent;
+  font-size: 0;
+}
+
+.order-card-content {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto auto auto;
+  gap: 8px;
+  padding: 10px;
+}
+
+.order-card-header {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+}
+
+.status-stack {
+  display: grid;
+  gap: 5px;
+  justify-items: end;
+}
+
+.delivered-date {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.order-heading {
+  min-width: 0;
+}
+
+.order-id {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1;
+}
+
+.order-title {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.95rem;
+  line-height: 1.2;
+  letter-spacing: 0;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.customer-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.order-customer,
+.order-location {
+  margin: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.order-meta-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.order-meta-row > div {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(190, 199, 210, 0.1);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.order-meta-label,
+.tracking-row span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.order-meta-row strong,
+.tracking-row strong {
+  display: block;
+  overflow: hidden;
+  font-size: 0.82rem;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tracking-row {
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  padding: 5px 7px;
+  border-radius: 5px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.status-chip.LATE { background: rgba(255, 107, 107, 0.16); color: var(--late); }
+.status-chip.SOON { background: rgba(243, 179, 76, 0.16); color: var(--soon); }
+.status-chip.SHIPS_SOON { background: rgba(255, 107, 107, 0.18); color: var(--late); }
+.status-chip.OK { background: rgba(85, 214, 133, 0.14); color: var(--ok); }
+.status-chip.SHIPPED { background: rgba(112, 167, 255, 0.16); color: var(--shipped); }
+.status-chip.IN_TRANSIT { background: rgba(112, 167, 255, 0.16); color: var(--shipped); }
+.status-chip.DELIVERED { background: rgba(85, 214, 133, 0.14); color: var(--ok); }
+.status-chip.RETURNED,
+.status-chip.TRACKING_ISSUE { background: rgba(255, 107, 107, 0.18); color: var(--late); }
+.status-chip.OPEN { background: rgba(243, 179, 76, 0.16); color: var(--soon); }
+
+.empty-state {
+  display: none;
+  place-items: center;
+  min-height: 0;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.pagination-bar {
+  min-height: 38px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+#pageIndicator {
+  min-width: 58px;
+  text-align: center;
+  font-weight: 700;
+}
+
+@media (max-width: 1100px) {
+  .topbar {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar-actions {
+    min-width: 0;
+    grid-template-columns: 1fr;
+    justify-content: stretch;
+  }
+
+  .order-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  body {
+    overflow: auto;
+  }
+
+  .app-shell {
+    height: auto;
+    min-height: 100vh;
+    grid-template-rows: auto auto;
+  }
+
+  .topbar-actions,
+  .orders-header,
+  .action-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filter-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .order-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+  }
+
+  .order-card {
+    min-height: 340px;
+  }
+}
