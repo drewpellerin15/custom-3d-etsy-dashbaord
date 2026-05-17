@@ -813,7 +813,7 @@ async function formatReceipt(receipt, listingImages = {}) {
     id: receipt.receipt_id,
     receiptId: receipt.receipt_id,
     orderId: receipt.order_id || null,
-    etsyUrl: `https://www.etsy.com/your/shops/me/orders/${receipt.receipt_id}`,
+    etsyUrl: `https://www.etsy.com/your/orders/sold?ref=seller-platform-mcnav&order_id=${receipt.receipt_id}`,
     name: receipt.name || receipt.first_line || "Customer",
     city: receipt.city || "",
     state: receipt.state || "",
