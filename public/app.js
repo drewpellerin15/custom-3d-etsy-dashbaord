@@ -184,8 +184,11 @@ function buildCard(order) {
   const deliveredDate = order.status === "DELIVERED"
     ? formatDate(order.trackingStatusDate || order.shippedAt)
     : null;
-  const primaryDateLabel = order.status === "DELIVERED" ? "Ship by" : "Ship by";
-  const primaryDateValue = formatDate(order.shipBy);
+  const hasShipped = ["SHIPPED", "IN_TRANSIT", "DELIVERED", "RETURNED", "TRACKING_ISSUE"].includes(order.status);
+  const primaryDateLabel = hasShipped ? "Shipped on" : "Ship by";
+  const primaryDateValue = hasShipped
+    ? formatDate(order.shippedAt || order.shipBy)
+    : formatDate(order.shipBy);
   const etsyUrl = order.etsyUrl ||
     `https://www.etsy.com/your/orders/sold?ref=seller-platform-mcnav&order_id=${encodeURIComponent(order.receiptId || order.id || "")}`;
 
@@ -317,6 +320,15 @@ function refresh() {
 
 function reconnectEtsy() {
   window.location.href = "/oauth";
+}
+
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen?.();
+    return;
+  }
+
+  document.exitFullscreen?.();
 }
 
 function setFilter(filter) {
