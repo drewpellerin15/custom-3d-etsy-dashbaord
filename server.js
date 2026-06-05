@@ -8,6 +8,7 @@ const crypto = require("crypto");
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
 const CONFIG_PATH = path.join(__dirname, "config.json");
+const ORDER_CACHE_PATH = path.join(__dirname, "order-cache.json");
 const ETSY_TOKEN_URL = "https://api.etsy.com/v3/public/oauth/token";
 const ETSY_API_BASE = "https://api.etsy.com/v3/application";
 const SHIPPO_API_BASE = "https://api.goshippo.com";
@@ -17,6 +18,8 @@ const listingImageCache = new Map();
 const shippoTrackingCache = new Map();
 const DASHBOARD_PASSWORD = process.env.DASHBOARD_PASSWORD || "3739";
 const DASHBOARD_TIME_ZONE = process.env.DASHBOARD_TIME_ZONE || "America/Chicago";
+const TRACKING_LOOKBACK_DAYS = Number(process.env.TRACKING_LOOKBACK_DAYS || 60);
+const TRACKING_REFRESH_MINUTES = Number(process.env.TRACKING_REFRESH_MINUTES || 30);
 const REQUIRED_CONFIG_FIELDS = [
   "etsy_api_key",
   "etsy_api_secret",
@@ -46,9 +49,50 @@ function loadConfig() {
 }
 
 let config = loadConfig();
+let orderCache = loadOrderCache();
+let orderCacheDirty = false;
 
 function saveConfig() {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2) + "\n");
+}
+
+function loadOrderCache() {
+  if (!fs.existsSync(ORDER_CACHE_PATH)) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(fs.readFileSync(ORDER_CACHE_PATH, "utf8"));
+  } catch (error) {
+    console.error("[Order cache] Failed to load cache. Starting fresh.", error);
+    return {};
+  }
+}
+
+function saveOrderCache() {
+  if (!orderCacheDirty) return;
+
+  fs.writeFileSync(ORDER_CACHE_PATH, JSON.stringify(orderCache, null, 2) + "\n");
+  orderCacheDirty = false;
+}
+
+function updateOrderCache(receiptId, patch) {
+  const key = String(receiptId);
+  const current = orderCache[key] || {};
+  const next = {
+    ...current,
+    ...Object.fromEntries(
+      Object.entries(patch).filter(([, value]) => value !== undefined)
+    ),
+    updatedAt: new Date().toISOString()
+  };
+
+  if (JSON.stringify(current) !== JSON.stringify(next)) {
+    orderCache[key] = next;
+    orderCacheDirty = true;
+  }
+
+  return orderCache[key];
 }
 
 function trimString(value) {
@@ -674,6 +718,29 @@ function isCurrentMonthIso(value) {
   return date.getUTCFullYear() === now.getUTCFullYear() && date.getUTCMonth() === now.getUTCMonth();
 }
 
+function isWithinTrackingLookback(value) {
+  if (!value) return false;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  return Date.now() - date.getTime() <= TRACKING_LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
+}
+
+function isTrackingRefreshDue(cachedOrder) {
+  if (!cachedOrder.lastTrackingCheckAt) return true;
+  const lastCheck = new Date(cachedOrder.lastTrackingCheckAt);
+  if (Number.isNaN(lastCheck.getTime())) return true;
+
+  return Date.now() - lastCheck.getTime() >= TRACKING_REFRESH_MINUTES * 60 * 1000;
+}
+
+function shouldRefreshTracking(cachedOrder, shippedAt) {
+  if (!cachedOrder.trackingStatus) return true;
+  if (cachedOrder.trackingStatus === "DELIVERED") return false;
+  if (!isTrackingRefreshDue(cachedOrder)) return false;
+
+  return isCurrentMonthIso(shippedAt) || isWithinTrackingLookback(shippedAt);
+}
+
 function looksLikeUspsTrackingNumber(trackingCode) {
   return /^(9[0-9]{19,33}|420[0-9]{5}9[0-9]{19,33})$/.test(String(trackingCode || "").trim());
 }
@@ -794,18 +861,42 @@ async function formatReceipt(receipt, listingImages = {}) {
   );
   const isOpen = !isShipped && !isCanceled && rawStatus !== "completed";
   const tracking = getTracking(receipt);
+  const shipBy = getShipByDate(receipt);
   const shippedAt = dateFromUnixSeconds(
     receipt.shipped_timestamp ||
       receipt.shipped_date ||
       receipt.shipments?.[0]?.shipment_notification_timestamp
   );
+  const cachedOrder = updateOrderCache(receipt.receipt_id, {
+    receiptId: receipt.receipt_id,
+    etsyStatus: receipt.status || null,
+    isOpen,
+    isCanceled,
+    shipBy,
+    shippedAt,
+    tracking: tracking?.trackingCode || null,
+    carrier: tracking?.carrier || null
+  });
   let shippoTracking = null;
   let status = isShipped ? "SHIPPED" : "OPEN";
 
   if (rawStatus === "completed" && tracking) {
     try {
+      if (cachedOrder.trackingStatus === "DELIVERED" && cachedOrder.trackingStatusDate) {
+        shippoTracking = {
+          status: cachedOrder.trackingStatus,
+          statusDetails: cachedOrder.trackingDetails || null,
+          statusDate: cachedOrder.trackingStatusDate,
+          eta: cachedOrder.eta || null,
+          carrier: cachedOrder.carrier || tracking.carrier,
+          trackingNumber: cachedOrder.tracking || tracking.trackingCode
+        };
+        status = "DELIVERED";
+      }
       const cachedTracking = getCachedShippoTracking(tracking.carrier, tracking.trackingCode);
-      const shouldFetchTracking = cachedTracking !== undefined || isCurrentMonthIso(shippedAt);
+      const shouldFetchTracking =
+        !shippoTracking &&
+        (cachedTracking !== undefined || shouldRefreshTracking(cachedOrder, shippedAt));
 
       if (shouldFetchTracking) {
         shippoTracking = cachedTracking !== undefined
@@ -827,6 +918,27 @@ async function formatReceipt(receipt, listingImages = {}) {
     }
   }
 
+  if (shippoTracking) {
+    const deliveredAt =
+      status === "DELIVERED" && shippoTracking.status === "DELIVERED"
+        ? shippoTracking.statusDate || cachedOrder.deliveredAt || null
+        : cachedOrder.deliveredAt || null;
+
+    updateOrderCache(receipt.receipt_id, {
+      status,
+      trackingStatus: shippoTracking.status || null,
+      trackingDetails: shippoTracking.statusDetails || null,
+      trackingStatusDate: shippoTracking.statusDate || null,
+      lastTrackingCheckAt: new Date().toISOString(),
+      eta: shippoTracking.eta || null,
+      deliveredAt
+    });
+  } else {
+    updateOrderCache(receipt.receipt_id, { status });
+  }
+
+  const finalCache = orderCache[String(receipt.receipt_id)] || {};
+
   return {
     id: receipt.receipt_id,
     receiptId: receipt.receipt_id,
@@ -840,18 +952,19 @@ async function formatReceipt(receipt, listingImages = {}) {
     quantity: firstTransaction.quantity || null,
     image: listingId ? listingImages[listingId] || "" : "",
     createdAt: dateFromUnixSeconds(receipt.create_timestamp || receipt.created_timestamp),
-    shipBy: getShipByDate(receipt),
-    shippedAt,
+    shipBy: finalCache.shipBy || shipBy,
+    shippedAt: finalCache.shippedAt || shippedAt,
     status,
     isOpen,
     isCanceled,
     rawStatus: receipt.status || null,
     tracking: tracking?.trackingCode || null,
     carrier: tracking?.carrier || null,
-    trackingStatus: shippoTracking?.status || null,
-    trackingDetails: shippoTracking?.statusDetails || null,
-    trackingStatusDate: shippoTracking?.statusDate || null,
-    eta: shippoTracking?.eta || null,
+    trackingStatus: finalCache.trackingStatus || shippoTracking?.status || null,
+    trackingDetails: finalCache.trackingDetails || shippoTracking?.statusDetails || null,
+    trackingStatusDate: finalCache.trackingStatusDate || shippoTracking?.statusDate || null,
+    deliveredAt: finalCache.deliveredAt || null,
+    eta: finalCache.eta || shippoTracking?.eta || null,
     total: getMoneyValue(receipt.grandtotal),
     transactions: transactions.map((transaction) => ({
       id: transaction.transaction_id,
@@ -932,8 +1045,10 @@ async function getOrders() {
   const data = await etsyFetch(`/shops/${config.shop_id}/receipts?${params.toString()}`, {}, "Receipts");
   const receipts = Array.isArray(data?.results) ? data.results : [];
   const listingImages = await getListingImages(receipts);
+  const orders = await mapLimit(receipts, 6, (receipt) => formatReceipt(receipt, listingImages));
+  saveOrderCache();
 
-  return mapLimit(receipts, 6, (receipt) => formatReceipt(receipt, listingImages));
+  return orders;
 }
 
 // ================= API =================
