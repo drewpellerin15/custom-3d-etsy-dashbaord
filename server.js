@@ -774,8 +774,14 @@ function getTracking(receipt) {
 async function getShippoTracking(carrier, trackingCode) {
   normalizeConfig();
 
-  if (!config.shippo_api_key || !trackingCode) {
+  if (!trackingCode) {
     return null;
+  }
+
+  if (!config.shippo_api_key) {
+    const error = new Error("Shippo API key is missing.");
+    error.status = 500;
+    throw error;
   }
 
   const cacheKey = `${carrier}:${trackingCode}`;
@@ -845,6 +851,47 @@ function statusFromShippo(shippoTracking) {
   return "UNKNOWN";
 }
 
+function statusFromCachedTracking(cachedOrder) {
+  const cachedTrackingStatus = statusFromShippo({ status: cachedOrder?.trackingStatus || null });
+
+  if (cachedTrackingStatus !== "UNKNOWN") {
+    return cachedTrackingStatus;
+  }
+
+  return "TRACKING_ISSUE";
+}
+
+function describeShippoUnknown(tracking, shippoTracking) {
+  if (shippoTracking?.statusDetails) {
+    return shippoTracking.statusDetails;
+  }
+
+  const carrier = String(tracking?.carrier || "carrier").toUpperCase();
+  const trackingCode = tracking?.trackingCode || "unknown tracking number";
+  const rawStatus = String(shippoTracking?.status || "").toUpperCase() || "UNKNOWN";
+  return `Shippo returned ${rawStatus} for ${carrier} ${trackingCode}.`;
+}
+
+function describeShippoError(error, tracking) {
+  const messageList = Array.isArray(error?.shippo?.messages)
+    ? error.shippo.messages
+        .map((entry) => entry?.text || entry?.message || entry?.code || null)
+        .filter(Boolean)
+    : [];
+
+  const detail =
+    messageList[0] ||
+    error?.shippo?.detail ||
+    error?.shippo?.error ||
+    error?.shippo?.message ||
+    error?.message ||
+    "Shippo could not resolve this tracking number.";
+
+  const carrier = String(tracking?.carrier || "carrier").toUpperCase();
+  const trackingCode = tracking?.trackingCode || "unknown tracking number";
+  return `${detail} (${carrier} ${trackingCode})`;
+}
+
 async function formatReceipt(receipt, listingImages = {}) {
   const transactions = Array.isArray(receipt.transactions) ? receipt.transactions : [];
   const firstTransaction = transactions[0] || {};
@@ -878,6 +925,9 @@ async function formatReceipt(receipt, listingImages = {}) {
     carrier: tracking?.carrier || null
   });
   let shippoTracking = null;
+  let trackingStatusOverride = null;
+  let trackingDetailsOverride = null;
+  let trackingStatusDateOverride = null;
   let status = isShipped ? "SHIPPED" : "OPEN";
 
   if (rawStatus === "completed" && tracking) {
@@ -904,17 +954,23 @@ async function formatReceipt(receipt, listingImages = {}) {
           : await getShippoTracking(tracking.carrier, tracking.trackingCode);
         status = statusFromShippo(shippoTracking);
         if (status === "UNKNOWN") {
-          status = "DELIVERED";
+          status = "TRACKING_ISSUE";
+          trackingStatusOverride = shippoTracking?.status || "UNKNOWN";
+          trackingDetailsOverride = describeShippoUnknown(tracking, shippoTracking);
+          trackingStatusDateOverride = shippoTracking?.statusDate || null;
         }
       } else {
-        status = "DELIVERED";
+        status = statusFromCachedTracking(cachedOrder);
       }
     } catch (error) {
       console.error(`[Shippo ${tracking.carrier} ${tracking.trackingCode}] Failed`, {
         status: error.status,
         body: error.shippo || error.message
       });
-      status = "DELIVERED";
+      status = "TRACKING_ISSUE";
+      trackingStatusOverride = "ERROR";
+      trackingDetailsOverride = describeShippoError(error, tracking);
+      trackingStatusDateOverride = null;
     }
   }
 
@@ -926,15 +982,24 @@ async function formatReceipt(receipt, listingImages = {}) {
 
     updateOrderCache(receipt.receipt_id, {
       status,
-      trackingStatus: shippoTracking.status || null,
-      trackingDetails: shippoTracking.statusDetails || null,
-      trackingStatusDate: shippoTracking.statusDate || null,
+      trackingStatus: trackingStatusOverride || shippoTracking.status || null,
+      trackingDetails: trackingDetailsOverride || shippoTracking.statusDetails || null,
+      trackingStatusDate:
+        trackingStatusOverride !== null
+          ? trackingStatusDateOverride
+          : shippoTracking.statusDate || null,
       lastTrackingCheckAt: new Date().toISOString(),
       eta: shippoTracking.eta || null,
       deliveredAt
     });
   } else {
-    updateOrderCache(receipt.receipt_id, { status });
+    updateOrderCache(receipt.receipt_id, {
+      status,
+      trackingStatus: trackingStatusOverride,
+      trackingDetails: trackingDetailsOverride,
+      trackingStatusDate: trackingStatusDateOverride,
+      lastTrackingCheckAt: trackingStatusOverride ? new Date().toISOString() : undefined
+    });
   }
 
   const finalCache = orderCache[String(receipt.receipt_id)] || {};
