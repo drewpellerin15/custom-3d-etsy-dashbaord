@@ -16,6 +16,7 @@ const AUTH_COOKIE_NAME = "dashboard_auth";
 const listingImageCache = new Map();
 const shippoTrackingCache = new Map();
 const DASHBOARD_PASSWORD = process.env.DASHBOARD_PASSWORD || "3739";
+const DASHBOARD_TIME_ZONE = process.env.DASHBOARD_TIME_ZONE || "America/Chicago";
 const REQUIRED_CONFIG_FIELDS = [
   "etsy_api_key",
   "etsy_api_secret",
@@ -641,9 +642,7 @@ function getShipByDate(receipt) {
     receipt.max_processing_days_date ||
     transactions.find((transaction) => transaction.expected_ship_date)?.expected_ship_date;
   if (!timestamp) return null;
-  const milliseconds = Number(timestamp) * 1000;
-  if (!Number.isFinite(milliseconds)) return null;
-  return new Date(milliseconds).toISOString().split("T")[0];
+  return dateOnlyFromUnixSeconds(timestamp);
 }
 
 function dateFromUnixSeconds(timestamp) {
@@ -651,6 +650,20 @@ function dateFromUnixSeconds(timestamp) {
   const milliseconds = Number(timestamp) * 1000;
   if (!Number.isFinite(milliseconds)) return null;
   return new Date(milliseconds).toISOString();
+}
+
+function dateOnlyFromUnixSeconds(timestamp) {
+  if (!timestamp) return null;
+  const milliseconds = Number(timestamp) * 1000;
+  if (!Number.isFinite(milliseconds)) return null;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: DASHBOARD_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date(milliseconds));
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
 }
 
 function isCurrentMonthIso(value) {
@@ -762,7 +775,7 @@ function statusFromShippo(shippoTracking) {
   if (status === "RETURNED") return "RETURNED";
   if (status === "FAILURE") return "TRACKING_ISSUE";
 
-  return "SHIPPED";
+  return "UNKNOWN";
 }
 
 async function formatReceipt(receipt, listingImages = {}) {
@@ -799,13 +812,18 @@ async function formatReceipt(receipt, listingImages = {}) {
           ? cachedTracking
           : await getShippoTracking(tracking.carrier, tracking.trackingCode);
         status = statusFromShippo(shippoTracking);
+        if (status === "UNKNOWN") {
+          status = "DELIVERED";
+        }
+      } else {
+        status = "DELIVERED";
       }
     } catch (error) {
       console.error(`[Shippo ${tracking.carrier} ${tracking.trackingCode}] Failed`, {
         status: error.status,
         body: error.shippo || error.message
       });
-      status = "SHIPPED";
+      status = "DELIVERED";
     }
   }
 
