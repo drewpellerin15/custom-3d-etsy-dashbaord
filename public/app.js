@@ -182,7 +182,7 @@ function buildCard(order) {
   const location = [order.city, order.state].filter(Boolean).join(", ");
   const transactionCount = Array.isArray(order.transactions) ? order.transactions.length : 0;
   const deliveredDate = order.status === "DELIVERED"
-    ? formatDate(order.trackingStatusDate || order.shippedAt)
+    ? formatDate(order.deliveredAt)
     : null;
   const hasShipped = ["SHIPPED", "IN_TRANSIT", "DELIVERED", "RETURNED", "TRACKING_ISSUE"].includes(order.status);
   const primaryDateLabel = hasShipped ? "Shipped on" : "Ship by";
