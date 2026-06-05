@@ -359,6 +359,17 @@ button:disabled {
   padding-top: 2px;
 }
 
+.tracking-details {
+  display: -webkit-box;
+  margin: 6px 0 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .status-chip {
   display: inline-flex;
   align-items: center;

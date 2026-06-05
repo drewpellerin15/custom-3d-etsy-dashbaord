@@ -181,6 +181,7 @@ function buildCard(order) {
   const image = order.image || placeholderImage;
   const location = [order.city, order.state].filter(Boolean).join(", ");
   const transactionCount = Array.isArray(order.transactions) ? order.transactions.length : 0;
+  const trackingDetails = order.trackingDetails ? escapeHtml(order.trackingDetails) : "";
   const deliveredDate = order.status === "DELIVERED"
     ? formatDate(order.deliveredAt)
     : null;
@@ -232,6 +233,7 @@ function buildCard(order) {
         <div class="tracking-row">
           <span>Tracking</span>
           <strong>${escapeHtml(order.tracking || "Not available")}</strong>
+          ${trackingDetails ? `<p class="tracking-details">${trackingDetails}</p>` : ""}
         </div>
       </div>
     </article>
