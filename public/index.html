@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="utf-8">
   <title>Etsy Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="style.css">
@@ -37,6 +38,7 @@
           <button class="filter-tab active" data-filter="ALL" onclick="setFilter('ALL')">All</button>
           <button class="filter-tab" data-filter="OPEN" onclick="setFilter('OPEN')">Open</button>
           <button class="filter-tab" data-filter="SHIPPED" onclick="setFilter('SHIPPED')">Shipped</button>
+          <button class="filter-tab" data-filter="HIDDEN" onclick="setFilter('HIDDEN')">Hidden</button>
         </div>
       </div>
 
@@ -51,6 +53,21 @@
     </div>
 </div>
 
+<p id="admin-feedback" class="sr-only" role="status"></p>
+<div id="order-menu" class="order-menu" popover="auto" role="menu" aria-label="Order actions"></div>
+<dialog id="admin-dialog" aria-labelledby="admin-title" aria-describedby="admin-description">
+  <form id="admin-form">
+    <h2 id="admin-title"></h2>
+    <p id="admin-description"></p>
+    <label id="admin-status-field">Status<select id="admin-status"></select></label>
+    <label id="admin-note-field">Note<textarea id="admin-note" rows="5" maxlength="2000" placeholder="Add production details or a reminder…"></textarea></label>
+    <p id="admin-error" role="alert"></p>
+    <div class="dialog-actions">
+      <button id="admin-cancel" class="secondary" type="button">Cancel</button>
+      <button id="admin-save" class="primary" type="submit">Save</button>
+    </div>
+  </form>
+</dialog>
 <script src="app.js"></script>
 </body>
 </html>

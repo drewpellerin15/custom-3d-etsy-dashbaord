@@ -4,3 +4,5 @@ order-cache.json
 .env
 .DS_Store
 npm-debug.log*
+order-admin.json
+order-admin.json.tmp

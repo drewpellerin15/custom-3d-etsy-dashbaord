@@ -4,11 +4,13 @@ const fs = require("fs");
 const path = require("path");
 const cors = require("cors");
 const crypto = require("crypto");
+const { createAdminStore, applyAdmin, transactionVariations } = require("./order-admin");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
 const CONFIG_PATH = path.join(__dirname, "config.json");
-const ORDER_CACHE_PATH = path.join(__dirname, "order-cache.json");
+const ORDER_CACHE_PATH = process.env.ORDER_CACHE_PATH || path.join(__dirname, "order-cache.json");
+const adminStore = createAdminStore(process.env.ORDER_ADMIN_PATH || path.join(__dirname, "order-admin.json"));
 const ETSY_TOKEN_URL = "https://api.etsy.com/v3/public/oauth/token";
 const ETSY_API_BASE = "https://api.etsy.com/v3/application";
 const SHIPPO_API_BASE = "https://api.goshippo.com";
@@ -379,7 +381,7 @@ function requireDashboardAuth(req, res, next) {
     return;
   }
 
-  if (req.path === "/orders" || req.path === "/health") {
+  if (req.path === "/orders" || req.path.startsWith("/orders/") || req.path === "/health") {
     res.status(401).json({ error: "Authentication required" });
     return;
   }
@@ -928,7 +930,7 @@ async function formatReceipt(receipt, listingImages = {}) {
   let trackingStatusOverride = null;
   let trackingDetailsOverride = null;
   let trackingStatusDateOverride = null;
-  let status = isShipped ? "SHIPPED" : "OPEN";
+  let status = isCanceled ? "CANCELED" : isShipped ? "SHIPPED" : "OPEN";
 
   if (rawStatus === "completed" && tracking) {
     try {
@@ -1036,6 +1038,7 @@ async function formatReceipt(receipt, listingImages = {}) {
       listingId: transaction.listing_id,
       title: transaction.title,
       quantity: transaction.quantity,
+      variations: transactionVariations(transaction),
       image: transaction.listing_id ? listingImages[transaction.listing_id] || "" : ""
     }))
   };
@@ -1120,7 +1123,7 @@ async function getOrders() {
 app.get("/orders", async (req, res) => {
   try {
     const orders = await getOrders();
-    res.json(orders);
+    res.json(orders.map((order) => applyAdmin(order, adminStore.get(order.receiptId))));
   } catch (error) {
     console.error("[Orders] Failed", {
       status: error.status,
@@ -1131,6 +1134,24 @@ app.get("/orders", async (req, res) => {
       error: "Unable to load Etsy orders",
       detail: error.etsy || error.message
     });
+  }
+});
+
+// Only the authenticated dashboard can edit local order metadata. This never writes to Etsy.
+app.patch("/orders/:id/admin", (req, res) => {
+  // A custom header prevents cross-site forms; reject cross-site fetches as well.
+  if (req.get("X-Dashboard-Request") !== "1" || req.get("Sec-Fetch-Site") === "cross-site") {
+    return res.status(403).json({ error: "Use the dashboard to update orders" });
+  }
+  if (!Object.prototype.hasOwnProperty.call(orderCache, req.params.id)) {
+    return res.status(404).json({ error: "Order not found. Refresh the dashboard first." });
+  }
+  try {
+    const admin = adminStore.update(req.params.id, req.body);
+    res.json({ admin });
+  } catch (error) {
+    console.error("[Order admin] Update failed", error.message);
+    res.status(error.status || 500).json({ error: error.status ? error.message : "Unable to save order changes" });
   }
 });
 
@@ -1147,7 +1168,7 @@ app.get("/health", (req, res) => {
 });
 
 // ================= START =================
-app.listen(PORT, () => {
+if (require.main === module) app.listen(PORT, () => {
   normalizeConfig();
   const missing = missingFields(REQUIRED_CONFIG_FIELDS);
 
@@ -1156,3 +1177,5 @@ app.listen(PORT, () => {
     console.warn(`Missing config field(s): ${missing.join(", ")}`);
   }
 });
+
+module.exports = { app, formatReceipt };
